@@ -80,6 +80,8 @@ wss.on('connection', function connection(ws) {
 
   let connection_id = connections.length;
 
+  console.log('Connected client: ' + connection_id);
+
   connections[connection_id] = {
     last_sync: moment('1970-01-01T00:00:00+00:00')
   }
@@ -91,7 +93,8 @@ wss.on('connection', function connection(ws) {
       fetch(ws, connection_id);
     } else {
       ws.close();
+      console.log('Closed connection: ' + connection_id);
       clearInterval(int);
     }
-  }, 2000)
+  }, 5000)
 });
