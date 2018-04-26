@@ -32,10 +32,11 @@ let fetch = function(ws, connection_id) {
     if (err) {
       console.log("Error", connection_id, err);
     } else {
-      console.log("Success", connection_id, response);
+      // console.log("Success", connection_id, response);
       data = response.Items;
 
       data = filterByTimestamp(data, connections[connection_id].last_sync);
+      data = filterByRead(data, connections[connection_id].last_sync);
 
       if (data.length) {
         connections[connection_id].last_sync = moment();
@@ -73,9 +74,57 @@ let filterByTimestamp = function(items, timestamp) {
   return returnItems;
 }
 
+let filterByRead = function (items, timestamp) {
+  let returnItems = [];
+  items.forEach(function(item) {
+    if (!item.Status) {
+      returnItems.push(item);
+    }
+    if (item.Status && item.Status.S !== 'markAsRead') {
+      returnItems.push(item);
+    }
+  });
+  return returnItems;
+}
+
 wss.on('connection', function connection(ws) {
   ws.on('message', function incoming(message) {
     console.log('received: %s', message);
+
+    let clientResponse;
+    try{
+      clientResponse = JSON.parse(message);
+      console.log('client response: %s', clientResponse);
+    } catch (error) {
+      console.log(' error parsing incoming message as JSON, message: %s', message);
+    }
+
+    let updateParams = {
+      ExpressionAttributeNames: {
+       "#Y": 'Status'
+      }, 
+      ExpressionAttributeValues: {
+       ":y": {
+         S: clientResponse.type
+        }
+      }, 
+      Key: {
+          'id': {
+            N: '' + clientResponse.id
+          } 
+      },
+      TableName: 'liveroad',
+      UpdateExpression: 'SET #Y = :y' 
+    };
+
+    ddb.updateItem(updateParams, function(err, clientResponse) {
+        if (err) {
+            console.log('Error saving client response:' + err);
+        } else {
+            console.log('clientResponse saved :' + JSON.stringify(clientResponse));
+        }
+    })
+
   });
 
   let connection_id = connections.length;
